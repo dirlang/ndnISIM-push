@@ -1,0 +1,127 @@
+#!/bin/bash
+./waf
+# Generate the average Interest satisfied rate like this:
+# frequency	randomwait-sch	multicast-sch	randomwait-cch	multicast-cch
+# 5				0.65			0.85			0.6				0.75
+# 10			0.7				0.55			0.6				0.75
+# 15			0.2				0.2				0.6				0.5
+# generatefile:averageSatisfiedRate.csv
+
+# Required file:
+# satisfiedRate.py 			Calculate the satisfied rate from trace file in ndnSIM.
+# satisfiedRateAverage.py 	Calculate the average satisfied rate from $times times experiments.
+# rateConcat.py 				Concat every strategy's  average satisfied rate
+# rateConcat2.py 				Concat diffrent frequency average satisfied rate 
+# satisfiedRate.plt				Draw
+
+
+
+
+#Set simulation times and frequency
+times=10			#Experiment times
+minfrequency=20		#Min frequency
+frequencystep=5		#Frequency step
+maxfrequency=25		#Max frequency
+
+
+echo "simulate times:$times"
+
+
+file1="randomwait-sch.dat"
+file2="multicast-sch.dat"
+file3="randomwait-cch.dat"
+file4="multicast-cch.dat"
+min=$minfrequency
+max=$maxfrequency
+step=$frequencystep
+
+
+while [ $minfrequency -le $maxfrequency ]; do
+
+
+#randomwait-sch SCH
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform randomwait-sch SCH"
+	./waf --run ndn-v2v --command-template="%s random-wait $minfrequency SCH randomwait-sch$i.txt"
+	python satisfiedRate.py randomwait-sch$i.txt
+	rm -rf randomwait-sch$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file1 
+
+
+
+
+#randomwait-cch CCH
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform randomwait-cch CCH"
+	./waf --run ndn-v2v --command-template="%s random-wait $minfrequency CCH randomwait-cch$i.txt"
+	python satisfiedRate.py randomwait-cch$i.txt
+	rm -rf randomwait-cch$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file3 
+
+
+
+#multicast-sch SCH
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform multicast-sch SCH"
+	./waf --run ndn-v2v --command-template="%s multicast $minfrequency SCH multicast-sch$i.txt"
+	python satisfiedRate.py multicast-sch$i.txt
+	rm -rf multicast-sch$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file2 
+
+
+
+
+#multicast-cch CCH
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform multicast-cch CCH"
+	./waf --run ndn-v2v --command-template="%s multicast $minfrequency CCH multicast-cch$i.txt"
+	python satisfiedRate.py multicast-cch$i.txt
+	rm -rf multicast-cch$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file4 
+
+
+python rateConcat.py $file1 $file2 $file3 $file4 $minfrequency
+
+
+minfrequency=$(($minfrequency+$frequencystep))
+
+done
+
+
+while [ $min -le $(($max-$step)) ]; do
+
+ python rateConcat2.py  averageSatisfiedRate-$(($min)).csv averageSatisfiedRate-$(($min+$step)).csv $(($min+$step))
+
+
+min=$(($min+$step))
+
+done
+
+mv averageSatisfiedRate-$(($max)).csv averageSatisfiedRate.csv
+cat averageSatisfiedRate.csv
+
+gnuplot -p satisfiedRate.plt

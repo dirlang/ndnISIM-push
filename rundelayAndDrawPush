@@ -1,0 +1,166 @@
+#!/bin/sh
+# just need to change the frequency value (5, 10, 15) in command line and datafile*
+# the app-delay figure will be drawn.
+# required: gnuplot 5.2, python 2.67
+
+./waf configure -d debug
+./waf
+
+
+
+#Set simulation times and frequency
+times=20			#Experiment times
+minfrequency=10		#Min frequency
+frequencystep=1		#Frequency step , not = 0
+maxfrequency=10		#Max frequency
+
+
+
+
+datafile1="multicast-pull-$minfrequency.dat"
+datafile2="multicast-push-$minfrequency.dat"
+
+
+
+tag="p"
+
+
+
+
+#datafile3="multicast-pull"
+#datafile4="multicast-push"
+min=$minfrequency
+max=$maxfrequency
+step=$frequencystep
+
+
+while [ $minfrequency -le $maxfrequency ]; do
+
+#randomwait-sch PULL
+i=0
+while [ $i -lt $times ];do
+	echo "Perform multicast Pull"
+	./waf --run ndn-v2v-push --command-template="%s multicast $minfrequency pull multicast-pull$i.txt"
+	python delay.py multicast-pull$i.txt multicast-pull-$minfrequency$i.dat
+	#python satisfiedRate.py multicast-pull$i.txt
+	rm -rf multicast-pull$i.txt
+	i=$(($i+1))
+done
+
+
+j=0
+i=$times
+while [ $i -gt 0 ];do
+	if [ -f "multicast-pull-$minfrequency$i.dat" ];then
+		cp multicast-pull-$minfrequency$i.dat multicast-pull-$minfrequency$j$tag.dat
+		j=$(($j+1))
+	fi
+
+i=$(($i-1))
+done
+
+
+
+ t=0
+ k=1
+echo "average......."
+
+python delayCombine.py multicast-pull-$minfrequency$t$tag.dat  multicast-pull-$minfrequency$k$tag.dat
+
+i=1
+while [ $i -lt $(($j-1)) ];do
+	a=$(($i+1))
+	python delayCombine.py delay.csv multicast-pull-$minfrequency$a$tag.dat
+	rm -rf multicast-pull$i$tag.dat
+	i=$(($i+1))
+done
+python average.py delay.csv
+# python satisfiedRateAverage.py rate.dat $file3
+
+
+
+
+#multicast-sch PUSH
+i=0
+while [ $i -lt $times ];do
+	echo "Perform multicast Push"
+	./waf --run ndn-v2v-push --command-template="%s multicast $minfrequency push multicast-push$i.txt"
+	python delay.py multicast-push$i.txt multicast-push-$minfrequency$i.dat
+	rm -rf multicast-push$i.txt
+	i=$(($i+1))
+done
+
+
+j=0
+i=$times
+while [ $i -gt 0 ];do
+	if [ -f "multicast-push-$minfrequency$i.dat" ];then
+		cp multicast-push-$minfrequency$i.dat multicast-push-$minfrequency$j$tag.dat
+		j=$(($j+1))
+	fi
+
+i=$(($i-1))
+done
+
+ t=0
+ k=1
+echo "average......."
+
+python delayCombine.py multicast-push-$minfrequency$t$tag.dat  multicast-push-$minfrequency$k$tag.dat
+
+
+i=1
+while [ $i -lt $(($j-1)) ];do
+	a=$(($i+1))
+	python delayCombine.py delay.csv multicast-push-$minfrequency$a$tag.dat
+	rm -rf multicast-push$i$tag.dat
+	i=$(($i+1))
+done
+python average.py delay.csv
+
+
+mv multicast-push-$minfrequency$t.dat $datafile2
+mv multicast-pull-$minfrequency$t.dat $datafile1
+
+# generate delay.csv, combine " delay-multicast.dat" and "delay-random-wait.dat"
+python delayCombine.py $datafile1  $datafile2
+
+echo "Draw ... ..."
+
+
+mv delay.csv delayPush.csv
+
+
+gnuplot -p delayPush.plt
+
+
+
+
+
+
+
+i=0
+echo "clear......"
+while [ $i -lt $times ];do
+	rm -rf multicast-pull-$minfrequency$i.dat
+	rm -rf multicast-push-$minfrequency$i.dat
+	rm -rf multicast-pull-$minfrequency$i$tag.dat
+	rm -rf multicast-push-$minfrequency$i$tag.dat
+	i=$(($i+1))
+done
+rm -rf multicast-pull-$minfrequency.dat
+rm -rf multicast-push-$minfrequency.dat
+
+
+minfrequency=$(($minfrequency+$frequencystep))
+done
+
+
+rm -rf multicast-push.dat
+rm -rf multicast-push.txt
+rm -rf multicast-pull.dat
+rm -rf multicast-pull.txt
+
+
+
+

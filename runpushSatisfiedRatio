@@ -1,0 +1,97 @@
+#!/bin/bash
+./waf
+# Generate the average Interest satisfied rate like this:
+# frequency	randomwait-sch	multicast-sch	randomwait-cch	multicast-cch
+# 5				0.65			0.85			0.6				0.75
+# 10			0.7				0.55			0.6				0.75
+# 15			0.2				0.2				0.6				0.5
+# generatefile:averageSatisfiedRate.csv
+
+# Required file:
+# satisfiedRate.py 			Calculate the satisfied rate from trace file in ndnSIM.
+# satisfiedRateAverage.py 	Calculate the average satisfied rate from $times times experiments.
+# rateConcat.py 				Concat every strategy's  average satisfied rate
+# rateConcat2.py 				Concat diffrent frequency average satisfied rate 
+# satisfiedRate.plt				Draw
+
+
+
+
+#Set simulation times and frequency
+times=20			#Experiment times
+minfrequency=12		#Min frequency
+frequencystep=2		#Frequency step
+maxfrequency=12		#Max frequency
+
+
+echo "simulate times:$times"
+
+
+
+file1="multicast-pull.dat"
+
+file2="multicast-push.dat"
+min=$minfrequency
+max=$maxfrequency
+step=$frequencystep
+
+
+while [ $minfrequency -le $maxfrequency ]; do
+
+
+#multicast-sch PULL
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform multicast-sch PULL"
+	./waf --run ndn-v2v-push --command-template="%s multicast $minfrequency pull multicast-pull$i.txt"
+	python satisfiedRatioForPull.py multicast-pull$i.txt
+	rm -rf multicast-pull$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file1 
+
+
+
+
+#multicast-sch PUSH
+i=0
+
+rm -rf rate.dat
+while [ $i -lt $times ];do
+	echo "Perform multicast-sch PUSH"
+	./waf --run ndn-v2v-push --command-template="%s multicast $minfrequency push multicast-push$i.txt"
+	python satisfiedRate.py multicast-push$i.txt
+	rm -rf multicast-push$i.txt
+	i=$(($i+1))
+done
+
+python satisfiedRateAverage.py rate.dat $file2 
+
+
+python rateConcat.py $file1 $file2  $minfrequency
+
+
+
+minfrequency=$(($minfrequency+$frequencystep))
+
+done
+
+
+
+while [ $min -le $(($max-$step)) ]; do
+
+ python rateConcat2.py  averageSatisfiedRate-$(($min)).csv averageSatisfiedRate-$(($min+$step)).csv $(($min+$step))
+
+
+min=$(($min+$step))
+
+done
+
+
+mv averageSatisfiedRate-$(($max)).csv averageSatisfiedRatio-pushpull.csv
+cat averageSatisfiedRatio-pushpull.csv
+
+gnuplot -p pushsatisfiedRatio.plt
