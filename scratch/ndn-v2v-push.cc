@@ -524,7 +524,7 @@ NdnV2VTest::InstallBackground(int nPair, int frequency)
         it2 = it1;
         int j = rand() % nodeSet.size();
         srand(time(NULL)); /*根据当前时间设置“随机数种子”*/
-        if (j==0) j = rand() % nodeSet.size(); // avoid consumerId == producerId
+        while (j==0) j = rand() % nodeSet.size(); // avoid consumerId == producerId
         advance(it2, j);
 
         int producerId = *it2;
